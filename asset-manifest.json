@@ -1,0 +1,13 @@
+{
+  "files": {
+    "main.css": "/jifei/static/css/main.1f504de3.css",
+    "main.js": "/jifei/static/js/main.04c8fa3c.js",
+    "index.html": "/jifei/index.html",
+    "main.1f504de3.css.map": "/jifei/static/css/main.1f504de3.css.map",
+    "main.04c8fa3c.js.map": "/jifei/static/js/main.04c8fa3c.js.map"
+  },
+  "entrypoints": [
+    "static/css/main.1f504de3.css",
+    "static/js/main.04c8fa3c.js"
+  ]
+}
