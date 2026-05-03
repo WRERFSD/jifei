@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>鹈鹕镇计费系统</title>
+  
+  <!-- 引入所需的库 -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+    /* 隐藏滚动条让界面更像App */
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #d6d3d1; border-radius: 10px; }
+  </style>
+</head>
+<body class="bg-amber-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect } = React;
+
+    // --- 图标组件 (替代原本的 Lucide 图标以保证单文件可运行) ---
+    const Icons = {
+      Coffee: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 8h1a4 4 0 1 1 0 8h-1"/><path d="M3 8h14v9a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4Z"/><line x1="6" y1="2" x2="6" y2="4"/><line x1="10" y1="2" x2="10" y2="4"/><line x1="14" y1="2" x2="14" y2="4"/></svg>,
+      DollarSign: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>,
+      Play: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="5 3 19 12 5 21 5 3"/></svg>,
+      Timer: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="10" y1="2" x2="14" y2="2"/><line x1="12" y1="14" x2="15" y2="11"/><circle cx="12" cy="14" r="8"/></svg>,
+      History: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>,
+      Search: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+      Clock: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+      CheckSquare: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>,
+      X: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+      AlertCircle: ({ className }) => <svg xmlns="http://www.w3.org/2000/svg" className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    };
+
+    // 计费常量
+    const HOURLY_RATE = 9.9;
+    const MINUTE_RATE = HOURLY_RATE / 60;
+    const STORAGE_KEY = 'pelican_sessions_data';
+
+    function App() {
+      // 核心修改：从本地硬盘（浏览器缓存）读取初始数据
+      const [sessions, setSessions] = useState(() => {
+        const savedData = localStorage.getItem(STORAGE_KEY);
+        if (savedData) {
+          try {
+            return JSON.parse(savedData);
+          } catch (e) {
+            console.error("读取本地数据失败", e);
+            return [];
+          }
+        }
+        return [];
+      });
+
+      const [now, setNow] = useState(Date.now());
+      const [phoneTail, setPhoneTail] = useState('');
+      const [duration, setDuration] = useState('');
+      const [checkoutSession, setCheckoutSession] = useState(null);
+      const [searchQuery, setSearchQuery] = useState('');
+      const [alertMessage, setAlertMessage] = useState('');
+
+      // 核心修改：每次 sessions 发生变化时，立刻存入本地硬盘
+      useEffect(() => {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(sessions));
+      }, [sessions]);
+
+      // 每秒更新时间
+      useEffect(() => {
+        const timerId = setInterval(() => {
+          setNow(Date.now());
+        }, 1000);
+        return () => clearInterval(timerId);
+      }, []);
+
+      const handleStart = (e) => {
+        e.preventDefault();
+        if (!phoneTail || phoneTail.length < 2) {
+          setAlertMessage("请输入有效的手机尾号（至少2位）");
+          return;
+        }
+
+        if (sessions.some(s => s.phoneTail === phoneTail.trim())) {
+          setAlertMessage("该手机尾号已在计费中，请勿重复开台！");
+          return;
+        }
+
+        const PREP_TIME_MS = 5 * 60 * 1000;
+        const sessionId = Date.now().toString();
+
+        const newSession = {
+          id: sessionId,
+          phoneTail: phoneTail.trim(),
+          startTime: Date.now() + PREP_TIME_MS,
+          targetDuration: duration ? parseInt(duration, 10) : null,
+        };
+
+        // 直接更新状态，会自动触发 useEffect 保存到硬盘
+        const updatedSessions = [...sessions, newSession];
+        updatedSessions.sort((a, b) => a.startTime - b.startTime);
+        setSessions(updatedSessions);
+        
+        setPhoneTail('');
+        setDuration('');
+      };
+
+      const handleCheckoutClick = (session) => {
+        setCheckoutSession(session);
+      };
+
+      const confirmCheckout = () => {
+        if (!checkoutSession) return;
+        setSessions(sessions.filter((s) => s.id !== checkoutSession.id));
+        setCheckoutSession(null);
+      };
+
+      const getElapsedSeconds = (startTime) => {
+        return Math.floor((now - startTime) / 1000);
+      };
+
+      const calculateCost = (elapsedSeconds) => {
+        const billableSeconds = Math.max(0, elapsedSeconds);
+        const elapsedMinutes = Math.ceil(billableSeconds / 60);
+        return (elapsedMinutes * MINUTE_RATE).toFixed(2);
+      };
+
+      const formatTime = (totalSeconds) => {
+        const sign = totalSeconds < 0 ? "-" : "";
+        const absSec = Math.abs(totalSeconds);
+        const h = Math.floor(absSec / 3600).toString().padStart(2, '0');
+        const m = Math.floor((absSec % 3600) / 60).toString().padStart(2, '0');
+        const s = (absSec % 60).toString().padStart(2, '0');
+        return `${sign}${h}:${m}:${s}`;
+      };
+
+      const filteredSessions = sessions.filter(session => session.phoneTail.includes(searchQuery));
+
+      return (
+        <div className="min-h-screen text-stone-800 font-sans pb-10">
+          <header className="bg-amber-600 text-white shadow-md">
+            <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                <Icons.Coffee className="w-8 h-8 text-amber-100" />
+                <h1 className="text-2xl font-bold tracking-wide">鹈鹕镇拼豆桌游店</h1>
+              </div>
+              <div className="flex items-center space-x-2 text-amber-100 bg-amber-700/50 px-3 py-1.5 rounded-full text-sm font-medium">
+                <Icons.DollarSign className="w-4 h-4" />
+                <span>费率：9.9元 / 小时</span>
+              </div>
+            </div>
+          </header>
+
+          <main className="max-w-6xl mx-auto px-4 py-8 space-y-8">
+            <section className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6">
+              <h2 className="text-lg font-bold text-amber-900 mb-4 flex items-center">
+                <Icons.Play className="w-5 h-5 mr-2" />
+                新客开台
+              </h2>
+              <form onSubmit={handleStart} className="flex flex-col md:flex-row gap-4 items-end">
+                <div className="flex-1 w-full">
+                  <label className="block text-sm font-medium text-stone-600 mb-1">手机尾号 <span className="text-red-500">*</span></label>
+                  <input type="text" maxLength="4" value={phoneTail} onChange={(e) => setPhoneTail(e.target.value.replace(/\D/g, ''))} placeholder="例如: 8866" className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal" required />
+                </div>
+                <div className="flex-1 w-full">
+                  <label className="block text-sm font-medium text-stone-600 mb-1">预设倒计时 (选填)</label>
+                  <div className="relative">
+                    <input type="number" min="1" value={duration} onChange={(e) => setDuration(e.target.value)} placeholder="例如: 60" className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal pr-12" />
+                    <span className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 font-medium">分钟</span>
+                  </div>
+                </div>
+                <button type="submit" disabled={!phoneTail} className="w-full md:w-auto px-8 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-sm hover:shadow transition-all flex items-center justify-center h-[46px]">
+                  <Icons.Timer className="w-5 h-5 mr-2" />
+                  开始计时
+                </button>
+              </form>
+            </section>
+
+            <section>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 gap-4">
+                <h2 className="text-lg font-bold text-amber-900 flex items-center">
+                  <Icons.History className="w-5 h-5 mr-2" />
+                  当前计费中 ({sessions.length})
+                </h2>
+                <div className="relative">
+                  <input type="text" placeholder="搜索手机尾号..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value.replace(/\D/g, ''))} className="w-full sm:w-64 pl-10 pr-4 py-2 bg-white border border-amber-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 transition-all text-sm" />
+                  <Icons.Search className="w-4 h-4 text-stone-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                </div>
+              </div>
+
+              {sessions.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-dashed border-stone-300 p-12 text-center text-stone-400">
+                  <Icons.Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-lg">暂无计费中的客人</p>
+                </div>
+              ) : filteredSessions.length === 0 ? (
+                <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center text-stone-400">
+                  <Icons.Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                  <p className="text-lg">未找到该尾号的订单</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredSessions.map((session) => {
+                    const elapsedSecs = getElapsedSeconds(session.startTime);
+                    const cost = calculateCost(elapsedSecs);
+                    let remainingSecs = null;
+                    let isOvertime = false;
+
+                    if (session.targetDuration) {
+                      remainingSecs = session.targetDuration * 60 - elapsedSecs;
+                      isOvertime = remainingSecs < 0;
+                    }
+
+                    return (
+                      <div key={session.id} className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden flex flex-col hover:border-amber-300 transition-colors">
+                        <div className="bg-stone-50 px-5 py-3 border-b border-stone-100 flex justify-between items-center">
+                          <span className="font-bold text-lg text-stone-800 flex items-center">
+                            尾号：<span className="text-amber-600 text-xl ml-1">{session.phoneTail}</span>
+                          </span>
+                          <span className="text-xs font-medium text-stone-400 bg-stone-200/50 px-2 py-1 rounded">
+                            {new Date(session.startTime - 5 * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 开台
+                          </span>
+                        </div>
+                        <div className="p-5 flex-1 space-y-4">
+                          <div className="space-y-2">
+                            {session.targetDuration ? (
+                              <div className="flex justify-between items-end">
+                                <span className="text-sm font-medium text-stone-500">倒计时</span>
+                                <span className={`text-3xl font-mono font-bold tracking-tight ${isOvertime ? 'text-red-500' : 'text-stone-800'}`}>
+                                  {isOvertime ? '+' : ''}{formatTime(Math.abs(remainingSecs))}
+                                </span>
+                              </div>
+                            ) : (
+                              <div className="flex justify-between items-end">
+                                <span className="text-sm font-medium text-stone-500">已用时</span>
+                                <span className="text-3xl font-mono font-bold tracking-tight text-amber-600">
+                                  {formatTime(elapsedSecs)}
+                                </span>
+                              </div>
+                            )}
+                            {session.targetDuration && (
+                               <div className="flex justify-between text-xs font-medium text-stone-400 border-t border-stone-100 pt-2 mt-2">
+                                 <span>计费时长: {Math.ceil(Math.max(0, elapsedSecs)/60)} 分钟</span>
+                                 <span>预设: {session.targetDuration} 分钟</span>
+                               </div>
+                            )}
+                          </div>
+                          <div className="bg-amber-50 rounded-xl p-3 flex justify-between items-center">
+                            <span className="text-sm font-medium text-amber-800 flex items-center">
+                              <Icons.DollarSign className="w-4 h-4 mr-1" />
+                              实时费用
+                            </span>
+                            <span className="text-2xl font-bold text-amber-600">
+                              <span className="text-lg mr-1">¥</span>{cost}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="p-4 pt-0">
+                          <button onClick={() => handleCheckoutClick(session)} className="w-full py-3 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-bold flex items-center justify-center transition-colors">
+                            <Icons.CheckSquare className="w-5 h-5 mr-2" />
+                            结账
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </section>
+          </main>
+
+          {checkoutSession && (
+            <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+                <div className="bg-amber-500 p-6 text-center relative">
+                  <button onClick={() => setCheckoutSession(null)} className="absolute right-4 top-4 text-amber-100 hover:text-white transition-colors">
+                    <Icons.X className="w-6 h-6" />
+                  </button>
+                  <div className="w-16 h-16 bg-white rounded-full flex items-center justify-center mx-auto mb-3 shadow-sm">
+                    <Icons.DollarSign className="w-8 h-8 text-amber-500" />
+                  </div>
+                  <h3 className="text-2xl font-bold text-white">确认结账</h3>
+                  <p className="text-amber-100 mt-1 font-medium">尾号 {checkoutSession.phoneTail} 的客人</p>
+                </div>
+                <div className="p-6 space-y-4">
+                  <div className="flex justify-between items-center border-b border-stone-100 pb-3">
+                    <span className="text-stone-500">开始时间</span>
+                    <span className="font-medium text-stone-800">{new Date(checkoutSession.startTime - 5 * 60 * 1000).toLocaleTimeString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-stone-100 pb-3">
+                    <span className="text-stone-500">计费时长</span>
+                    <span className="font-medium text-stone-800">{Math.ceil(Math.max(0, getElapsedSeconds(checkoutSession.startTime)) / 60)} 分钟</span>
+                  </div>
+                  <div className="flex justify-between items-center pt-2">
+                    <span className="text-stone-600 font-bold">总计应付</span>
+                    <span className="text-3xl font-bold text-amber-600">¥ {calculateCost(getElapsedSeconds(checkoutSession.startTime))}</span>
+                  </div>
+                </div>
+                <div className="p-4 bg-stone-50 grid grid-cols-2 gap-3">
+                  <button onClick={() => setCheckoutSession(null)} className="py-3 px-4 bg-white border border-stone-200 text-stone-600 rounded-xl font-bold hover:bg-stone-50 transition-colors">取消</button>
+                  <button onClick={confirmCheckout} className="py-3 px-4 bg-amber-500 text-white rounded-xl font-bold hover:bg-amber-600 shadow-sm hover:shadow transition-all">确认收款</button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {alertMessage && (
+            <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+              <div className="bg-white rounded-2xl shadow-xl max-w-sm w-full p-6 text-center animate-in fade-in zoom-in-95 duration-200">
+                <Icons.AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-3" />
+                <h3 className="text-xl font-bold text-stone-800 mb-2">提示</h3>
+                <p className="text-stone-600 mb-6">{alertMessage}</p>
+                <button onClick={() => setAlertMessage('')} className="w-full py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold transition-colors">我知道了</button>
+              </div>
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<App />);
+  </script>
+</body>
+</html>
