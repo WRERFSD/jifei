@@ -1,0 +1,10 @@
+{
+  "short_name": "鹈鹕镇",
+  "name": "鹈鹕镇拼豆桌游店",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#000000",
+  "description": "鹈鹕镇拼豆桌游店计费系统",
+  "icons": []
+}
