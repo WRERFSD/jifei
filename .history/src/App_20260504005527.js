@@ -590,45 +590,6 @@ export default function App() {
         </section>
       </main>
 
-      {/* 拆分付款弹窗 */}
-      {splitSession && splitSession.groupMembers && (
-        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-blue-500 p-6 text-center relative">
-              <button 
-                onClick={() => setSplitSession(null)}
-                className="absolute right-4 top-4 text-blue-100 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-              <h3 className="text-2xl font-bold text-white">拆分付款</h3>
-              <p className="text-blue-100 mt-1 font-medium">选择先结账的客人</p>
-            </div>
-            
-            <div className="p-6 space-y-2">
-              {splitSession.groupMembers.map((member) => (
-                <button
-                  key={member}
-                  onClick={() => handleSplitCheckout(splitSession, member)}
-                  className="w-full py-3 px-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 rounded-xl font-bold transition-colors text-left"
-                >
-                  {member}
-                </button>
-              ))}
-            </div>
-
-            <div className="p-4 bg-stone-50 border-t border-stone-200">
-              <button
-                onClick={() => setSplitSession(null)}
-                className="w-full py-2.5 bg-stone-300 hover:bg-stone-400 text-white rounded-xl font-bold transition-colors"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* 结账确认弹窗 */}
       {checkoutSession && (
         <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">

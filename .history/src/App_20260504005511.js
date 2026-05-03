@@ -471,11 +471,6 @@ export default function App() {
                     <div className="bg-stone-50 px-5 py-3 border-b border-stone-100 flex justify-between items-center">
                       <span className="font-bold text-lg text-stone-800 flex items-center">
                         尾号：<span className="text-amber-600 text-xl ml-1">{session.phoneTail}</span>
-                        {session.groupMembers && session.groupMembers.length > 1 && (
-                          <span className="ml-2 text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded">
-                            {session.groupMembers.length}人
-                          </span>
-                        )}
                       </span>
                       <span className="text-xs font-medium text-stone-400 bg-stone-200/50 px-2 py-1 rounded">
                         {new Date(session.startTime - (session.prepTimeMinutes || 0) * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 开台
@@ -521,59 +516,10 @@ export default function App() {
                           <span className="text-lg mr-1">¥</span>{cost}
                         </span>
                       </div>
-
-                      {/* 备注区 */}
-                      {editingNoteId === session.id ? (
-                        <div className="space-y-2">
-                          <textarea
-                            value={editingNoteText}
-                            onChange={(e) => setEditingNoteText(e.target.value)}
-                            placeholder="输入备注..."
-                            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white resize-none text-sm"
-                            rows="2"
-                          />
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => saveNote(session.id)}
-                              className="flex-1 py-1.5 bg-green-500 hover:bg-green-600 text-white rounded-lg font-medium text-sm transition-colors"
-                            >
-                              保存
-                            </button>
-                            <button
-                              onClick={() => setEditingNoteId(null)}
-                              className="flex-1 py-1.5 bg-stone-300 hover:bg-stone-400 text-white rounded-lg font-medium text-sm transition-colors"
-                            >
-                              取消
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div
-                          onClick={() => handleEditNote(session)}
-                          className="p-3 bg-stone-50 border border-stone-200 rounded-lg cursor-pointer hover:bg-stone-100 transition-colors text-sm"
-                        >
-                          {session.note ? (
-                            <>
-                              <p className="font-medium text-stone-600 mb-1">备注：</p>
-                              <p className="text-stone-700 whitespace-pre-wrap">{session.note}</p>
-                            </>
-                          ) : (
-                            <p className="text-stone-400 italic">点击添加备注...</p>
-                          )}
-                        </div>
-                      )}
                     </div>
 
-                    {/* 操作按钮 */}
-                    <div className="p-4 pt-0 space-y-2">
-                      {session.groupMembers && session.groupMembers.length > 1 && (
-                        <button
-                          onClick={() => setSplitSession(session)}
-                          className="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
-                        >
-                          拆分付款
-                        </button>
-                      )}
+                    {/* 结账按钮 */}
+                    <div className="p-4 pt-0">
                       <button
                         onClick={() => handleCheckoutClick(session)}
                         className="w-full py-3 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-bold flex items-center justify-center transition-colors"
@@ -589,45 +535,6 @@ export default function App() {
           )}
         </section>
       </main>
-
-      {/* 拆分付款弹窗 */}
-      {splitSession && splitSession.groupMembers && (
-        <div className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-sm w-full overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="bg-blue-500 p-6 text-center relative">
-              <button 
-                onClick={() => setSplitSession(null)}
-                className="absolute right-4 top-4 text-blue-100 hover:text-white transition-colors"
-              >
-                <X className="w-6 h-6" />
-              </button>
-              <h3 className="text-2xl font-bold text-white">拆分付款</h3>
-              <p className="text-blue-100 mt-1 font-medium">选择先结账的客人</p>
-            </div>
-            
-            <div className="p-6 space-y-2">
-              {splitSession.groupMembers.map((member) => (
-                <button
-                  key={member}
-                  onClick={() => handleSplitCheckout(splitSession, member)}
-                  className="w-full py-3 px-4 bg-blue-50 hover:bg-blue-100 border border-blue-200 text-blue-900 rounded-xl font-bold transition-colors text-left"
-                >
-                  {member}
-                </button>
-              ))}
-            </div>
-
-            <div className="p-4 bg-stone-50 border-t border-stone-200">
-              <button
-                onClick={() => setSplitSession(null)}
-                className="w-full py-2.5 bg-stone-300 hover:bg-stone-400 text-white rounded-xl font-bold transition-colors"
-              >
-                取消
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* 结账确认弹窗 */}
       {checkoutSession && (
