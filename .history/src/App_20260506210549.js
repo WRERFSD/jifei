@@ -12,12 +12,7 @@ const loadSessions = () => {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_SESSIONS_KEY);
-    const sessions = raw ? JSON.parse(raw) : [];
-    // 确保所有session都有groupMembers属性（兼容旧数据）
-    return sessions.map((session) => ({
-      ...session,
-      groupMembers: session.groupMembers || [session.phoneTail] || [],
-    }));
+    return raw ? JSON.parse(raw) : [];
   } catch (error) {
     console.error('Load sessions error:', error);
     return [];
@@ -130,7 +125,7 @@ export default function App() {
       return;
     }
 
-    if (sessions.some((session) => (session.groupMembers || []).some((member) => groupMembers.includes(member)))) {
+    if (sessions.some((session) => session.groupMembers.some((member) => groupMembers.includes(member)))) {
       setAlertMessage('存在已在计费中的尾号，请检查是否重复开台');
       return;
     }
@@ -182,9 +177,8 @@ export default function App() {
   };
 
   const handleSplitCheckout = (session, member) => {
-    const members = session.groupMembers || [];
-    if (members.length <= 1) return;
-    const remainingMembers = members.filter((tail) => tail !== member);
+    if (session.groupMembers.length <= 1) return;
+    const remainingMembers = session.groupMembers.filter((tail) => tail !== member);
     const splitSession = {
       ...session,
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
@@ -531,7 +525,7 @@ export default function App() {
               <p className="text-blue-100 mt-2">请选择先单独结账的客人</p>
             </div>
             <div className="p-6 space-y-3">
-              {(splitSession.groupMembers || []).map((member) => (
+              {splitSession.groupMembers.map((member) => (
                 <button
                   key={member}
                   onClick={() => handleSplitCheckout(splitSession, member)}

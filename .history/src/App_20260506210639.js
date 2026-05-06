@@ -12,12 +12,7 @@ const loadSessions = () => {
   if (typeof window === 'undefined') return [];
   try {
     const raw = localStorage.getItem(STORAGE_SESSIONS_KEY);
-    const sessions = raw ? JSON.parse(raw) : [];
-    // 确保所有session都有groupMembers属性（兼容旧数据）
-    return sessions.map((session) => ({
-      ...session,
-      groupMembers: session.groupMembers || [session.phoneTail] || [],
-    }));
+    return raw ? JSON.parse(raw) : [];
   } catch (error) {
     console.error('Load sessions error:', error);
     return [];
