@@ -244,7 +244,7 @@ export default function App() {
                     : 'text-amber-100 hover:bg-amber-700/30'
                 }`}
               >
-                <Grid className="w-4 h-4" />
+                <Grid3X3 className="w-4 h-4" />
                 座位视图
               </button>
             </div>

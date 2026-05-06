@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Play, CheckSquare, Coffee, DollarSign, AlertCircle, Timer, X, History, Search, Grid } from 'lucide-react';
+import { Clock, Play, CheckSquare, Coffee, DollarSign, AlertCircle, Timer, X, History, Search, Grid3X3 } from 'lucide-react';
 import SeatMap from './SeatMap';
 import DraggableSessionCard from './DraggableSessionCard';
 
@@ -244,7 +244,7 @@ export default function App() {
                     : 'text-amber-100 hover:bg-amber-700/30'
                 }`}
               >
-                <Grid className="w-4 h-4" />
+                <Grid3X3 className="w-4 h-4" />
                 座位视图
               </button>
             </div>

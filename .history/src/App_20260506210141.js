@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Clock, Play, CheckSquare, Coffee, DollarSign, AlertCircle, Timer, X, History, Search, Grid } from 'lucide-react';
+import { Clock, Play, CheckSquare, Coffee, DollarSign, AlertCircle, Timer, X, History, Search, Grid3X3 } from 'lucide-react';
 import SeatMap from './SeatMap';
 import DraggableSessionCard from './DraggableSessionCard';
 
@@ -224,41 +224,16 @@ export default function App() {
             <Coffee className="w-8 h-8 text-amber-100" />
             <h1 className="text-2xl font-bold tracking-wide">鹈鹕镇拼豆桌游店</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex gap-2 bg-amber-700/50 px-3 py-1.5 rounded-full">
-              <button
-                onClick={() => setViewMode('table')}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors ${
-                  viewMode === 'table'
-                    ? 'bg-amber-500 text-white'
-                    : 'text-amber-100 hover:bg-amber-700/30'
-                }`}
-              >
-                表格视图
-              </button>
-              <button
-                onClick={() => setViewMode('seat')}
-                className={`px-3 py-1 rounded-full text-sm font-medium transition-colors flex items-center gap-1 ${
-                  viewMode === 'seat'
-                    ? 'bg-amber-500 text-white'
-                    : 'text-amber-100 hover:bg-amber-700/30'
-                }`}
-              >
-                <Grid className="w-4 h-4" />
-                座位视图
-              </button>
-            </div>
-            <button
-              onClick={() => {
-                setRateEditing(true);
-                setRateInputValue(hourlyRate.toString());
-              }}
-              className="flex items-center space-x-2 text-amber-100 bg-amber-700/50 hover:bg-amber-700/70 px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
-            >
-              <DollarSign className="w-4 h-4" />
-              <span>费率：{hourlyRate.toFixed(2)}元 / 小时</span>
-            </button>
-          </div>
+          <button
+            onClick={() => {
+              setRateEditing(true);
+              setRateInputValue(hourlyRate.toString());
+            }}
+            className="flex items-center space-x-2 text-amber-100 bg-amber-700/50 hover:bg-amber-700/70 px-3 py-1.5 rounded-full text-sm font-medium transition-colors"
+          >
+            <DollarSign className="w-4 h-4" />
+            <span>费率：{hourlyRate.toFixed(2)}元 / 小时</span>
+          </button>
         </div>
       </header>
 
@@ -368,98 +343,145 @@ export default function App() {
             </div>
           </div>
 
-          {/* 座位视图 */}
-          {viewMode === 'seat' && (
-            <>
-              <SeatMap sessions={sessions} onSelectSeat={handleSeatSelect} selectedSeatId={selectedSeatId} />
-              
-              {/* 座位详情和可拖拽账单 */}
-              <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
-                <div className="lg:col-span-2">
-                  <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6">
-                    <h3 className="text-lg font-bold text-amber-900 mb-4">可拖拽的账单</h3>
-                    {sessions.length === 0 ? (
-                      <div className="text-center py-12 text-stone-400">
-                        <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                        <p>暂无账单，请先开台</p>
-                      </div>
-                    ) : (
-                      <div className="grid grid-cols-1 gap-4">
-                        {filteredSessions.map((session) => (
-                          <DraggableSessionCard
-                            key={session.id}
-                            session={session}
-                            now={now}
-                            hourlyRate={hourlyRate}
-                            onEditNote={handleEditNote}
-                            onSaveNote={saveNote}
-                            onDeleteSession={handleDeleteSession}
-                            onSplitCheckout={setSplitSession}
-                            onCheckout={handleCheckoutClick}
-                            editingNoteId={editingNoteId}
-                            editingNoteText={editingNoteText}
-                            setEditingNoteText={setEditingNoteText}
-                            onDragStart={(sessionId, e) => setDraggedSessionId(sessionId)}
-                            isEditMode={false}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+          {sessions.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-dashed border-stone-300 p-12 text-center text-stone-400">
+              <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg">暂无计费中的客人</p>
+              <p className="text-sm mt-1">在上方输入手机尾号开始计费</p>
+            </div>
+          ) : filteredSessions.length === 0 ? (
+            <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center text-stone-400">
+              <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
+              <p className="text-lg">未找到该尾号的订单</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {filteredSessions.map((session) => {
+                const elapsedSecs = getElapsedSeconds(session.startTime);
+                const cost = calculateCost(elapsedSecs);
+                let remainingSecs = null;
+                let isOvertime = false;
 
-                {/* 座位详情面板 */}
-                <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6">
-                  <h3 className="text-lg font-bold text-amber-900 mb-4">座位详情</h3>
-                  {selectedSeatId ? (
-                    <div className="text-center text-stone-500">选择的座位详情将显示在这里</div>
-                  ) : (
-                    <div className="text-center text-stone-400 py-8">
-                      <p>点击座位查看详情</p>
+                if (session.targetDuration) {
+                  remainingSecs = session.targetDuration * 60 - elapsedSecs;
+                  isOvertime = remainingSecs < 0;
+                }
+
+                return (
+                  <div key={session.id} className="bg-white rounded-2xl shadow-sm border border-stone-200 overflow-hidden flex flex-col hover:border-amber-300 transition-colors">
+                    <div className="bg-stone-50 px-5 py-3 border-b border-stone-100 flex justify-between items-center">
+                      <span className="font-bold text-lg text-stone-800 flex items-center gap-2">
+                        <span>尾号：</span>
+                        <span className="text-amber-600 text-xl">{session.phoneTail}</span>
+                        {session.groupMembers.length > 1 && (
+                          <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded">
+                            {session.groupMembers.length}人
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs font-medium text-stone-400 bg-stone-200/50 px-2 py-1 rounded">
+                        {new Date(session.startTime - (session.prepTimeMinutes || 0) * 60 * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })} 开台
+                      </span>
                     </div>
-                  )}
-                </div>
-              </div>
-            </>
-          )}
 
-          {/* 表格视图 */}
-          {viewMode === 'table' && (
-            <>
-              {sessions.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-dashed border-stone-300 p-12 text-center text-stone-400">
-                  <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-lg">暂无计费中的客人</p>
-                  <p className="text-sm mt-1">在上方输入手机尾号开始计费</p>
-                </div>
-              ) : filteredSessions.length === 0 ? (
-                <div className="bg-white rounded-2xl border border-stone-200 p-12 text-center text-stone-400">
-                  <Search className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                  <p className="text-lg">未找到该尾号的订单</p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredSessions.map((session) => (
-                    <DraggableSessionCard
-                      key={session.id}
-                      session={session}
-                      now={now}
-                      hourlyRate={hourlyRate}
-                      onEditNote={handleEditNote}
-                      onSaveNote={saveNote}
-                      onDeleteSession={handleDeleteSession}
-                      onSplitCheckout={setSplitSession}
-                      onCheckout={handleCheckoutClick}
-                      editingNoteId={editingNoteId}
-                      editingNoteText={editingNoteText}
-                      setEditingNoteText={setEditingNoteText}
-                      onDragStart={(sessionId, e) => setDraggedSessionId(sessionId)}
-                      isEditMode={false}
-                    />
-                  ))}
-                </div>
-              )}
-            </>
+                    <div className="p-5 flex-1 space-y-4">
+                      <div className="space-y-2">
+                        {session.targetDuration ? (
+                          <div className="flex justify-between items-end">
+                            <span className="text-sm font-medium text-stone-500">倒计时</span>
+                            <span className={`text-3xl font-mono font-bold tracking-tight ${isOvertime ? 'text-red-500' : 'text-stone-800'}`}>
+                              {isOvertime ? '+' : ''}{formatTime(Math.abs(remainingSecs))}
+                            </span>
+                          </div>
+                        ) : (
+                          <div className="flex justify-between items-end">
+                            <span className="text-sm font-medium text-stone-500">已用时</span>
+                            <span className="text-3xl font-mono font-bold tracking-tight text-amber-600">
+                              {formatTime(elapsedSecs)}
+                            </span>
+                          </div>
+                        )}
+
+                        {session.targetDuration && (
+                          <div className="flex justify-between text-xs font-medium text-stone-400 border-t border-stone-100 pt-2 mt-2">
+                            <span>计费时长: {Math.ceil(Math.max(0, elapsedSecs)/60)} 分钟</span>
+                            <span>预设: {session.targetDuration} 分钟</span>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="bg-amber-50 rounded-xl p-3 flex justify-between items-center">
+                        <span className="text-sm font-medium text-amber-800 flex items-center">
+                          <DollarSign className="w-4 h-4 mr-1" />
+                          实时费用
+                        </span>
+                        <span className="text-2xl font-bold text-amber-600">
+                          <span className="text-lg mr-1">¥</span>{cost}
+                        </span>
+                      </div>
+
+                      {editingNoteId === session.id ? (
+                        <div className="space-y-2">
+                          <textarea
+                            value={editingNoteText}
+                            onChange={(e) => setEditingNoteText(e.target.value)}
+                            placeholder="输入备注..."
+                            className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white resize-none text-sm"
+                            rows="3"
+                          />
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => saveNote(session.id)}
+                              className="flex-1 py-2 bg-green-500 hover:bg-green-600 text-white rounded-xl font-medium text-sm transition-colors"
+                            >
+                              保存
+                            </button>
+                            <button
+                              onClick={() => setEditingNoteId(null)}
+                              className="flex-1 py-2 bg-stone-300 hover:bg-stone-400 text-white rounded-xl font-medium text-sm transition-colors"
+                            >
+                              取消
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => handleEditNote(session)}
+                          className="p-3 bg-stone-50 border border-stone-200 rounded-lg cursor-pointer hover:bg-stone-100 transition-colors text-sm"
+                        >
+                          {session.note ? (
+                            <>
+                              <p className="font-medium text-stone-600 mb-1">备注：</p>
+                              <p className="text-stone-700 whitespace-pre-wrap">{session.note}</p>
+                            </>
+                          ) : (
+                            <p className="text-stone-400 italic">点击添加备注...</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="p-4 pt-0 space-y-2">
+                      {session.groupMembers.length > 1 && (
+                        <button
+                          onClick={() => setSplitSession(session)}
+                          className="w-full py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center"
+                        >
+                          拆分付款
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleCheckoutClick(session)}
+                        className="w-full py-3 bg-stone-800 hover:bg-stone-900 text-white rounded-xl font-bold flex items-center justify-center transition-colors"
+                      >
+                        <CheckSquare className="w-5 h-5 mr-2" />
+                        结账
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           )}
         </section>
       </main>
