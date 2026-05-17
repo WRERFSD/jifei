@@ -36,19 +36,6 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
     }
   }, [seats]);
 
-  // 监听外部更新（例如 App 直接写入 localStorage 后通知）并重新加载布局
-  useEffect(() => {
-    const handler = () => {
-      try {
-        setSeats(loadSeatsLayout());
-      } catch (e) {
-        console.error('reload seats failed', e);
-      }
-    };
-    window.addEventListener('jifei_seats_updated', handler);
-    return () => window.removeEventListener('jifei_seats_updated', handler);
-  }, []);
-
   useEffect(() => {
     setSeats((prev) =>
       prev.map((seat) =>

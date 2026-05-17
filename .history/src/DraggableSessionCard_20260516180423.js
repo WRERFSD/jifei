@@ -34,12 +34,11 @@ export default function DraggableSessionCard({
   };
 
   const elapsedSecs = getElapsedSeconds(session.startTime);
-  const isUnlimited = session.isUnlimited;
-  const cost = isUnlimited ? null : calculateCost(elapsedSecs);
+  const cost = calculateCost(elapsedSecs);
   let remainingSecs = null;
   let isOvertime = false;
 
-  if (!isUnlimited && session.targetDuration) {
+  if (session.targetDuration) {
     remainingSecs = session.targetDuration * 60 - elapsedSecs;
     isOvertime = remainingSecs < 0;
   }
@@ -60,8 +59,8 @@ export default function DraggableSessionCard({
       <div className="bg-stone-50 px-5 py-3 border-b border-stone-100 flex justify-between items-center">
         <span className="font-bold text-lg text-stone-800 flex flex-col gap-1">
           <span className="flex items-center gap-2">
-            <span>座位号：</span>
-            <span className="text-amber-600 text-xl">{session.seatNumber}</span>
+            <span>尾号：</span>
+            <span className="text-amber-600 text-xl">{session.phoneTail}</span>
             {(session.groupMembers?.length || 0) > 1 && (
               <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-1 rounded">
                 {session.groupMembers.length}人
@@ -85,14 +84,7 @@ export default function DraggableSessionCard({
       <div className="p-5 flex-1 space-y-4">
         {/* 时间显示 */}
         <div className="space-y-2">
-          {isUnlimited ? (
-            <div className="flex justify-between items-end">
-              <span className="text-sm font-medium text-stone-500">不限时</span>
-              <span className="text-3xl font-mono font-bold tracking-tight text-amber-600">
-                不计时
-              </span>
-            </div>
-          ) : session.targetDuration ? (
+          {session.targetDuration ? (
             <div className="flex justify-between items-end">
               <span className="text-sm font-medium text-stone-500">倒计时</span>
               <span
@@ -126,8 +118,9 @@ export default function DraggableSessionCard({
             <DollarSign className="w-4 h-4 mr-1" />
             实时费用
           </span>
-          <span className={`text-2xl font-bold ${isUnlimited ? 'text-stone-400' : 'text-amber-600'}`}>
-            {isUnlimited ? '不限时' : <><span className="text-lg mr-1">¥</span>{cost}</>}
+          <span className="text-2xl font-bold text-amber-600">
+            <span className="text-lg mr-1">¥</span>
+            {cost}
           </span>
         </div>
 

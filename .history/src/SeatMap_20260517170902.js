@@ -16,8 +16,6 @@ const loadSeatsLayout = () => {
 
 export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, hourlyRate, onClearSelection }) {
   const containerRef = useRef(null);
-  const BASE_MAP_WIDTH = 800;
-  const BASE_MAP_HEIGHT = 880;
   const [seats, setSeats] = useState(loadSeatsLayout);
   const [editMode, setEditMode] = useState(false);
   const [gridSize, setGridSize] = useState(8);
@@ -35,19 +33,6 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
       console.error('Save seats layout error:', error);
     }
   }, [seats]);
-
-  // 监听外部更新（例如 App 直接写入 localStorage 后通知）并重新加载布局
-  useEffect(() => {
-    const handler = () => {
-      try {
-        setSeats(loadSeatsLayout());
-      } catch (e) {
-        console.error('reload seats failed', e);
-      }
-    };
-    window.addEventListener('jifei_seats_updated', handler);
-    return () => window.removeEventListener('jifei_seats_updated', handler);
-  }, []);
 
   useEffect(() => {
     setSeats((prev) =>
@@ -188,11 +173,10 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
   const startSeatDrag = (seat, event) => {
     if (!editMode) return;
     const bounds = getContainerBounds();
-    const scale = Math.min(bounds.width / BASE_MAP_WIDTH, bounds.height / BASE_MAP_HEIGHT, 1) || 1;
     const pointerX = event.clientX - bounds.left;
     const pointerY = event.clientY - bounds.top;
     setDraggingSeatId(seat.id);
-    setDragOffset({ x: pointerX / scale - seat.x, y: pointerY / scale - seat.y });
+    setDragOffset({ x: pointerX - seat.x, y: pointerY - seat.y });
     event.currentTarget.setPointerCapture(event.pointerId);
   };
 
@@ -202,10 +186,9 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
     const onMove = (event) => {
       if (!draggingSeatId) return;
       const bounds = getContainerBounds();
-      const scale = Math.min(bounds.width / BASE_MAP_WIDTH, bounds.height / BASE_MAP_HEIGHT, 1) || 1;
       const pointerX = event.clientX - bounds.left;
       const pointerY = event.clientY - bounds.top;
-      updateSeatPosition(draggingSeatId, pointerX / scale - dragOffset.x, pointerY / scale - dragOffset.y);
+      updateSeatPosition(draggingSeatId, pointerX - dragOffset.x, pointerY - dragOffset.y);
     };
 
     const onUp = () => setDraggingSeatId(null);
@@ -236,12 +219,10 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
     return `${sign}${h}:${m}:${s}`;
   };
 
-  const bounds = getContainerBounds();
-  const scale = Math.min(bounds.width / BASE_MAP_WIDTH, bounds.height / BASE_MAP_HEIGHT, 1) || 1;
   const selectedSeat = selectedSeatId ? seats.find((seat) => seat.id === selectedSeatId) : null;
   const selectedSession = selectedSeat?.sessionId ? sessions.find((s) => s.id === selectedSeat.sessionId) : null;
-  const popupLeft = selectedSeat ? Math.min((selectedSeat.x + selectedSeat.size + 12) * scale, bounds.width - 280) : 0;
-  const popupTop = selectedSeat ? Math.max(selectedSeat.y * scale, 20) : 0;
+  const popupLeft = selectedSeat ? Math.min(selectedSeat.x + selectedSeat.size + 12, 420) : 0;
+  const popupTop = selectedSeat ? Math.max(selectedSeat.y, 20) : 0;
 
   const handleContainerClick = (event) => {
     if (event.target.closest('.seat-item') || event.target.closest('.seat-popup')) return;
@@ -279,8 +260,8 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
       </div>
 
       <div
-        className="relative bg-amber-50 border-2 border-dashed border-amber-200 rounded-xl overflow-hidden"
-        style={{ width: '100%', position: 'relative', paddingTop: '110%', minHeight: '380px', maxHeight: 'calc(100vh - 240px)' }}
+        className="relative bg-amber-50 border-2 border-dashed border-amber-200 rounded-xl overflow-auto"
+        style={{ height: '500px' }}
         ref={containerRef}
         onClick={handleContainerClick}
       >
@@ -407,8 +388,8 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
               key={seat.id}
               className="absolute group seat-item"
               style={{
-                left: `${seat.x * scale}px`,
-                top: `${seat.y * scale}px`,
+                left: `${seat.x}px`,
+                top: `${seat.y}px`,
                 cursor: editMode ? 'grab' : 'pointer',
               }}
               draggable={false}
@@ -435,8 +416,8 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
                     : 'bg-stone-400 hover:bg-stone-500'
                 } ${editMode ? 'ring-2 ring-yellow-400' : ''}`}
                 style={{
-                  width: `${seat.size * scale}px`,
-                  height: `${seat.size * scale}px`,
+                  width: `${seat.size}px`,
+                  height: `${seat.size}px`,
                 }}
               >
                 {session ? (
@@ -459,15 +440,7 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
               {editMode && (
                 <div className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    type="button"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteSeat(seat.id);
-                    }}
+                    onClick={() => deleteSeat(seat.id)}
                     className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md"
                   >
                     <Trash2 className="w-4 h-4" />

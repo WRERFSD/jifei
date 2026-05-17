@@ -13,13 +13,10 @@ const loadSessions = () => {
   try {
     const raw = localStorage.getItem(STORAGE_SESSIONS_KEY);
     const sessions = raw ? JSON.parse(raw) : [];
-    // 确保所有session有坐位号和 groupMembers 属性（兼容旧数据）
+    // 确保所有session都有groupMembers属性（兼容旧数据）
     return sessions.map((session) => ({
       ...session,
-      seatNumber: session.seatNumber || session.phoneTail || '',
-      groupMembers:
-        session.groupMembers ||
-        (session.seatNumber || session.phoneTail ? [session.seatNumber || session.phoneTail] : []),
+      groupMembers: session.groupMembers || [session.phoneTail] || [],
       customerName: session.customerName || '',
       contactPhone: session.contactPhone || '',
       partySize: session.partySize || 1,
@@ -45,24 +42,25 @@ if (typeof window !== 'undefined') {
 export default function App() {
   const [sessions, setSessions] = useState(loadSessions);
   const [now, setNow] = useState(Date.now());
-  const [seatNumber, setSeatNumber] = useState('');
+  const [phoneTail, setPhoneTail] = useState('');
   const [customerName, setCustomerName] = useState('');
   const [contactPhone, setContactPhone] = useState('');
   const [partySize, setPartySize] = useState('1');
   const [groupTails, setGroupTails] = useState('');
   const [duration, setDuration] = useState('');
   const [prepTime, setPrepTime] = useState('');
-  const [unlimitedTime, setUnlimitedTime] = useState(false);
   const [checkoutSession, setCheckoutSession] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [selectedSeatId, setSelectedSeatId] = useState(null);
+  const [selectedSeat, setSelectedSeat] = useState(null);
+  const [pendingUnbindSeatId, setPendingUnbindSeatId] = useState(null);
   const [hourlyRate, setHourlyRate] = useState(loadHourlyRate);
   const [rateEditing, setRateEditing] = useState(false);
   const [rateInputValue, setRateInputValue] = useState(loadHourlyRate().toString());
   const [editingNoteId, setEditingNoteId] = useState(null);
   const [editingNoteText, setEditingNoteText] = useState('');
   const [splitSession, setSplitSession] = useState(null);
+  const [selectedSeatId, setSelectedSeatId] = useState(null);
   const [viewMode, setViewMode] = useState('table'); // 'table' 或 'seat'
   const [draggedSessionId, setDraggedSessionId] = useState(null);
 
@@ -126,13 +124,23 @@ export default function App() {
 
   const handleStart = (e) => {
     e.preventDefault();
-    const mainSeatNumber = seatNumber.trim();
+    const mainTail = phoneTail.trim().replace(/\D/g, '');
     const name = customerName.trim();
     const contact = contactPhone.trim();
     const party = parseInt(partySize, 10) || 1;
 
-    if (!mainSeatNumber) {
-      setAlertMessage('请输入座位号');
+    if (!name) {
+      setAlertMessage('请输入客人姓名');
+      return;
+    }
+
+    if (!contact) {
+      setAlertMessage('请输入联系电话');
+      return;
+    }
+
+    if (!mainTail || mainTail.length < 2) {
+      setAlertMessage('请输入有效的手机尾号（至少2位）');
       return;
     }
 
@@ -141,65 +149,43 @@ export default function App() {
       return;
     }
 
-    if (sessions.some((session) => session.seatNumber === mainSeatNumber)) {
-      setAlertMessage('该座位号已在使用中，请输入其他座位号');
+    const extraTails = parseGroupMembers(groupTails).filter((tail) => tail !== mainTail);
+    const groupMembers = [mainTail, ...extraTails];
+
+    if (groupMembers.some((tail) => tail.length < 2)) {
+      setAlertMessage('每个尾号至少需要两位数字');
       return;
     }
 
-    const extraTails = parseGroupMembers(groupTails).filter((tail) => tail !== mainSeatNumber);
-    const groupMembers = [mainSeatNumber, ...extraTails];
+    if (sessions.some((session) => (session.groupMembers || []).some((member) => groupMembers.includes(member)))) {
+      setAlertMessage('存在已在计费中的尾号，请检查是否重复开台');
+      return;
+    }
 
     const prepTimeMinutes = prepTime ? parseInt(prepTime, 10) : 0;
     const sessionId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
     const newSession = {
       id: sessionId,
-      seatNumber: mainSeatNumber,
+      phoneTail: mainTail,
       customerName: name,
       contactPhone: contact,
       partySize: party,
       groupMembers,
       startTime: Date.now() + prepTimeMinutes * 60 * 1000,
-      targetDuration: unlimitedTime ? null : duration ? parseInt(duration, 10) : null,
-      isUnlimited: unlimitedTime,
+      targetDuration: duration ? parseInt(duration, 10) : null,
       prepTimeMinutes,
       note: '',
     };
 
-    // 如果布局中存在与 seatNumber 匹配的空闲座位（name 或 id，忽略大小写），则直接绑定该座位
-    try {
-      const rawSeats = localStorage.getItem(STORAGE_SEATS_KEY);
-      const seatsLayout = rawSeats ? JSON.parse(rawSeats) : [];
-      const matchKey = mainSeatNumber.toString().trim().toLowerCase();
-      const found = seatsLayout.find((s) => {
-        const n = (s.name || '').toString().trim().toLowerCase();
-        const id = (s.id || '').toString().trim().toLowerCase();
-        return n === matchKey || id === matchKey;
-      });
-      if (found && !found.sessionId) {
-        found.sessionId = sessionId;
-        try {
-          localStorage.setItem(STORAGE_SEATS_KEY, JSON.stringify(seatsLayout));
-          // 通知 SeatMap 重新加载本地布局
-          window.dispatchEvent(new Event('jifei_seats_updated'));
-          setAlertMessage(`已自动绑定到座位 ${found.name || found.id}`);
-        } catch (e) {
-          console.error('保存座位布局失败', e);
-        }
-      }
-    } catch (e) {
-      console.error('解析座位布局失败', e);
-    }
-
     setSessions((prev) => [...prev, newSession].sort((a, b) => a.startTime - b.startTime));
-    setSeatNumber('');
+    setPhoneTail('');
     setCustomerName('');
     setContactPhone('');
     setPartySize('1');
     setGroupTails('');
     setDuration('');
     setPrepTime('');
-    setUnlimitedTime(false);
   };
 
   const handleCheckoutClick = (session) => setCheckoutSession(session);
@@ -235,7 +221,7 @@ export default function App() {
     const splitSession = {
       ...session,
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      seatNumber: member,
+      phoneTail: member,
       groupMembers: [member],
       note: session.note || '',
     };
@@ -247,7 +233,7 @@ export default function App() {
             ? {
                 ...item,
                 groupMembers: remainingMembers,
-                seatNumber: remainingMembers[0] || item.seatNumber,
+                phoneTail: remainingMembers[0] || item.phoneTail,
               }
             : item
         )
@@ -258,7 +244,7 @@ export default function App() {
   };
 
   const handleSeatSelect = (seat) => {
-    setSelectedSeatId(seat.id);
+    setSelectedSeat(seat);
   };
 
   const handleDeleteSession = (sessionId) => {
@@ -272,11 +258,15 @@ export default function App() {
 
     return (
       members.some((member) => member.includes(normalizedQuery)) ||
-      session.seatNumber.includes(normalizedQuery) ||
+      session.phoneTail.includes(normalizedQuery) ||
       session.customerName.toLowerCase().includes(normalizedQuery) ||
       session.contactPhone.includes(normalizedQuery)
     );
   });
+
+  const selectedSeatSession = selectedSeat?.sessionId
+    ? sessions.find((session) => session.id === selectedSeat.sessionId) || null
+    : null;
 
   return (
     <div className="min-h-screen bg-amber-50 text-stone-800 font-sans">
@@ -334,13 +324,14 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="w-full">
                 <label className="block text-sm font-medium text-stone-600 mb-1">
-                  座位号 <span className="text-red-500">*</span>
+                  手机尾号 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={seatNumber}
-                  onChange={(e) => setSeatNumber(e.target.value)}
-                  placeholder="例如: A1"
+                  maxLength="4"
+                  value={phoneTail}
+                  onChange={(e) => setPhoneTail(e.target.value.replace(/\D/g, ''))}
+                  placeholder="例如: 8866"
                   className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal"
                   required
                 />
@@ -348,7 +339,7 @@ export default function App() {
 
               <div className="w-full">
                 <label className="block text-sm font-medium text-stone-600 mb-1">
-                  客人姓名
+                  客人姓名 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -356,12 +347,13 @@ export default function App() {
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="例如: 小王"
                   className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal"
+                  required
                 />
               </div>
 
               <div className="w-full">
                 <label className="block text-sm font-medium text-stone-600 mb-1">
-                  联系电话
+                  联系电话 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -369,6 +361,7 @@ export default function App() {
                   onChange={(e) => setContactPhone(e.target.value)}
                   placeholder="例如: 138xxxx1234"
                   className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal"
+                  required
                 />
               </div>
 
@@ -388,11 +381,6 @@ export default function App() {
 
               <div className="w-full">
                 <label className="block text-sm font-medium text-stone-600 mb-1">
-                  准备时间 (选填)
-                </label>
-                <div className="relative">
-                  <input
-                    type="number"
                     min="0"
                     value={prepTime}
                     onChange={(e) => setPrepTime(e.target.value)}
@@ -416,37 +404,19 @@ export default function App() {
                     value={duration}
                     onChange={(e) => setDuration(e.target.value)}
                     placeholder="例如: 60"
-                    disabled={unlimitedTime}
-                    className={`w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal pr-12 ${unlimitedTime ? 'opacity-60 cursor-not-allowed' : ''}`}
+                    className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal pr-12"
                   />
                   <span className="absolute right-4 top-1/2 -translate-y-1/2 text-stone-400 font-medium">
                     分钟
                   </span>
                 </div>
               </div>
-
-              <div className="w-full flex items-center gap-2 px-4 py-3 rounded-xl bg-stone-50 border border-stone-200">
-                <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-stone-700">
-                  <input
-                    type="checkbox"
-                    checked={unlimitedTime}
-                    onChange={(e) => {
-                      setUnlimitedTime(e.target.checked);
-                      if (e.target.checked) {
-                        setDuration('');
-                      }
-                    }}
-                    className="w-4 h-4 text-amber-600 rounded border-stone-300 focus:ring-amber-500"
-                  />
-                  <span>不限时，不计时</span>
-                </label>
-              </div>
             </div>
 
             <div className="flex justify-end">
               <button
                 type="submit"
-                disabled={!seatNumber}
+                disabled={!phoneTail || !customerName || !contactPhone}
                 className="px-8 py-2.5 bg-amber-500 hover:bg-amber-600 disabled:bg-stone-300 disabled:cursor-not-allowed text-white rounded-xl font-bold text-lg shadow-sm hover:shadow transition-all flex items-center justify-center h-[46px]"
               >
                 <Timer className="w-5 h-5 mr-2" />
@@ -476,57 +446,116 @@ export default function App() {
 
           {/* 座位视图 */}
           {viewMode === 'seat' && (
-            <div className="mt-8 grid grid-cols-1 xl:grid-cols-[1fr_280px] gap-6">
+            <>
               <SeatMap
                 sessions={sessions}
                 onSelectSeat={handleSeatSelect}
-                selectedSeatId={selectedSeatId}
-                onClearSelection={() => setSelectedSeatId(null)}
-                now={now}
-                hourlyRate={hourlyRate}
+                selectedSeatId={selectedSeat?.id}
+                pendingUnbindSeatId={pendingUnbindSeatId}
+                onSeatUnbound={() => setPendingUnbindSeatId(null)}
               />
-              <div className="space-y-4">
+              
+              {/* 座位详情和可拖拽账单 */}
+              <div className="mt-8 grid grid-cols-1 lg:grid-cols-3 gap-6">
+                <div className="lg:col-span-2">
+                  <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6">
+                    <h3 className="text-lg font-bold text-amber-900 mb-4">可拖拽的账单</h3>
+                    {sessions.length === 0 ? (
+                      <div className="text-center py-12 text-stone-400">
+                        <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>暂无账单，请先开台</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 gap-4">
+                        {filteredSessions.map((session) => (
+                          <DraggableSessionCard
+                            key={session.id}
+                            session={session}
+                            now={now}
+                            hourlyRate={hourlyRate}
+                            onEditNote={handleEditNote}
+                            onSaveNote={saveNote}
+                            onDeleteSession={handleDeleteSession}
+                            onSplitCheckout={setSplitSession}
+                            onCheckout={handleCheckoutClick}
+                            editingNoteId={editingNoteId}
+                            editingNoteText={editingNoteText}
+                            setEditingNoteText={setEditingNoteText}
+                            onDragStart={(sessionId, e) => setDraggedSessionId(sessionId)}
+                            isEditMode={false}
+                          />
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* 座位详情面板 */}
                 <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6">
-                  <h3 className="text-lg font-bold text-amber-900 mb-4">拖拽订单</h3>
-                  {filteredSessions.length === 0 ? (
-                    <div className="text-center py-12 text-stone-400">
-                      <Clock className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                      <p>暂无账单，请先开台</p>
+                  <h3 className="text-lg font-bold text-amber-900 mb-4">座位详情</h3>
+                  {selectedSeat ? (
+                    <div className="space-y-4">
+                      <div className="text-sm text-stone-500">座位名称</div>
+                      <div className="text-xl font-bold text-stone-900">{selectedSeat.name}</div>
+
+                      {selectedSeatSession ? (
+                        <div className="space-y-3">
+                          <div className="text-sm text-stone-500">当前占用</div>
+                          <div className="rounded-2xl bg-amber-50 p-4 border border-amber-100">
+                            <div className="flex justify-between text-sm text-stone-600">
+                              <span>客人</span>
+                              <span>{selectedSeatSession.customerName}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-stone-600">
+                              <span>尾号</span>
+                              <span>{selectedSeatSession.phoneTail}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-stone-600">
+                              <span>联系电话</span>
+                              <span>{selectedSeatSession.contactPhone}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-stone-600">
+                              <span>人数</span>
+                              <span>{selectedSeatSession.partySize} 人</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-stone-600">
+                              <span>已用时</span>
+                              <span>{formatTime(getElapsedSeconds(selectedSeatSession.startTime))}</span>
+                            </div>
+                            <div className="flex justify-between text-sm text-stone-600">
+                              <span>当前费用</span>
+                              <span className="font-bold text-amber-600">¥{calculateCost(getElapsedSeconds(selectedSeatSession.startTime))}</span>
+                            </div>
+                          </div>
+                          {selectedSeatSession.note && (
+                            <div className="rounded-2xl bg-stone-50 p-3 border border-stone-200 text-sm text-stone-700">
+                              <div className="font-medium text-stone-800 mb-1">备注</div>
+                              <div className="whitespace-pre-wrap">{selectedSeatSession.note}</div>
+                            </div>
+                          )}
+                          <button
+                            onClick={() => setPendingUnbindSeatId(selectedSeat.id)}
+                            className="w-full py-3 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold transition-colors"
+                          >
+                            解绑座位
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="rounded-2xl bg-stone-50 p-6 border border-stone-200 text-center text-stone-500">
+                            该座位当前空闲，可将账单拖拽到此处绑定
+                          </div>
+                        </div>
+                      )}
                     </div>
                   ) : (
-                    <div className="grid gap-3">
-                      {filteredSessions.map((session) => (
-                        <button
-                          key={session.id}
-                          type="button"
-                          draggable
-                          onDragStart={(e) => {
-                            e.dataTransfer.effectAllowed = 'move';
-                            e.dataTransfer.setData('text/plain', session.id);
-                          }}
-                          className="w-full text-left rounded-3xl border border-stone-200 p-3 flex items-center justify-between gap-3 hover:border-amber-300 transition-colors bg-stone-50"
-                        >
-                          <div>
-                            <div className="text-sm font-semibold text-stone-900">{session.customerName || session.seatNumber}</div>
-                            <div className="text-xs text-stone-500">座位号 {session.seatNumber} · {session.partySize}人</div>
-                          </div>
-                          <span className="text-xs text-stone-500">拖拽</span>
-                        </button>
-                      ))}
+                    <div className="text-center text-stone-400 py-8">
+                      <p>点击座位查看详情</p>
                     </div>
                   )}
                 </div>
-                <div className="bg-white rounded-2xl shadow-sm border border-amber-100 p-6">
-                  <h3 className="text-lg font-bold text-amber-900 mb-4">使用提示</h3>
-                  <p className="text-sm text-stone-500 leading-6">
-                    编辑模式下可拖动座位。正常模式下将订单从右侧拖入空闲座位即可绑定。
-                  </p>
-                  <p className="text-sm text-stone-500 leading-6 mt-3">
-                    点击座位可查看悬浮详情，拖拽到已占用座位则会自动移桌。
-                  </p>
-                </div>
               </div>
-            </div>
+            </>
           )}
 
           {/* 表格视图 */}
@@ -665,7 +694,7 @@ export default function App() {
                 <DollarSign className="w-8 h-8 text-amber-500" />
               </div>
               <h3 className="text-2xl font-bold text-white">确认结账</h3>
-              <p className="text-amber-100 mt-1 font-medium">座位号 {checkoutSession.seatNumber} 的客人</p>
+              <p className="text-amber-100 mt-1 font-medium">尾号 {checkoutSession.phoneTail} 的客人</p>
             </div>
             <div className="p-6 space-y-4">
               <div className="flex justify-between items-center border-b border-stone-100 pb-3">

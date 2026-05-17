@@ -166,31 +166,6 @@ export default function App() {
       note: '',
     };
 
-    // 如果布局中存在与 seatNumber 匹配的空闲座位（name 或 id，忽略大小写），则直接绑定该座位
-    try {
-      const rawSeats = localStorage.getItem(STORAGE_SEATS_KEY);
-      const seatsLayout = rawSeats ? JSON.parse(rawSeats) : [];
-      const matchKey = mainSeatNumber.toString().trim().toLowerCase();
-      const found = seatsLayout.find((s) => {
-        const n = (s.name || '').toString().trim().toLowerCase();
-        const id = (s.id || '').toString().trim().toLowerCase();
-        return n === matchKey || id === matchKey;
-      });
-      if (found && !found.sessionId) {
-        found.sessionId = sessionId;
-        try {
-          localStorage.setItem(STORAGE_SEATS_KEY, JSON.stringify(seatsLayout));
-          // 通知 SeatMap 重新加载本地布局
-          window.dispatchEvent(new Event('jifei_seats_updated'));
-          setAlertMessage(`已自动绑定到座位 ${found.name || found.id}`);
-        } catch (e) {
-          console.error('保存座位布局失败', e);
-        }
-      }
-    } catch (e) {
-      console.error('解析座位布局失败', e);
-    }
-
     setSessions((prev) => [...prev, newSession].sort((a, b) => a.startTime - b.startTime));
     setSeatNumber('');
     setCustomerName('');
@@ -235,7 +210,7 @@ export default function App() {
     const splitSession = {
       ...session,
       id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-      seatNumber: member,
+      phoneTail: member,
       groupMembers: [member],
       note: session.note || '',
     };
@@ -247,7 +222,7 @@ export default function App() {
             ? {
                 ...item,
                 groupMembers: remainingMembers,
-                seatNumber: remainingMembers[0] || item.seatNumber,
+                phoneTail: remainingMembers[0] || item.phoneTail,
               }
             : item
         )
@@ -334,13 +309,14 @@ export default function App() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <div className="w-full">
                 <label className="block text-sm font-medium text-stone-600 mb-1">
-                  座位号 <span className="text-red-500">*</span>
+                  手机尾号 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
-                  value={seatNumber}
-                  onChange={(e) => setSeatNumber(e.target.value)}
-                  placeholder="例如: A1"
+                  maxLength="4"
+                  value={phoneTail}
+                  onChange={(e) => setPhoneTail(e.target.value.replace(/\D/g, ''))}
+                  placeholder="例如: 8866"
                   className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal"
                   required
                 />
@@ -348,7 +324,7 @@ export default function App() {
 
               <div className="w-full">
                 <label className="block text-sm font-medium text-stone-600 mb-1">
-                  客人姓名
+                  客人姓名 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -356,12 +332,13 @@ export default function App() {
                   onChange={(e) => setCustomerName(e.target.value)}
                   placeholder="例如: 小王"
                   className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal"
+                  required
                 />
               </div>
 
               <div className="w-full">
                 <label className="block text-sm font-medium text-stone-600 mb-1">
-                  联系电话
+                  联系电话 <span className="text-red-500">*</span>
                 </label>
                 <input
                   type="tel"
@@ -369,6 +346,7 @@ export default function App() {
                   onChange={(e) => setContactPhone(e.target.value)}
                   placeholder="例如: 138xxxx1234"
                   className="w-full px-4 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500 focus:bg-white transition-all text-lg font-medium placeholder:font-normal"
+                  required
                 />
               </div>
 
@@ -481,7 +459,6 @@ export default function App() {
                 sessions={sessions}
                 onSelectSeat={handleSeatSelect}
                 selectedSeatId={selectedSeatId}
-                onClearSelection={() => setSelectedSeatId(null)}
                 now={now}
                 hourlyRate={hourlyRate}
               />
@@ -507,8 +484,8 @@ export default function App() {
                           className="w-full text-left rounded-3xl border border-stone-200 p-3 flex items-center justify-between gap-3 hover:border-amber-300 transition-colors bg-stone-50"
                         >
                           <div>
-                            <div className="text-sm font-semibold text-stone-900">{session.customerName || session.seatNumber}</div>
-                            <div className="text-xs text-stone-500">座位号 {session.seatNumber} · {session.partySize}人</div>
+                            <div className="text-sm font-semibold text-stone-900">{session.customerName || session.phoneTail}</div>
+                            <div className="text-xs text-stone-500">尾号 {session.phoneTail} · {session.partySize}人</div>
                           </div>
                           <span className="text-xs text-stone-500">拖拽</span>
                         </button>

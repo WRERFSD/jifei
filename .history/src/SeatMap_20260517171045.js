@@ -36,19 +36,6 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
     }
   }, [seats]);
 
-  // 监听外部更新（例如 App 直接写入 localStorage 后通知）并重新加载布局
-  useEffect(() => {
-    const handler = () => {
-      try {
-        setSeats(loadSeatsLayout());
-      } catch (e) {
-        console.error('reload seats failed', e);
-      }
-    };
-    window.addEventListener('jifei_seats_updated', handler);
-    return () => window.removeEventListener('jifei_seats_updated', handler);
-  }, []);
-
   useEffect(() => {
     setSeats((prev) =>
       prev.map((seat) =>
@@ -279,8 +266,8 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
       </div>
 
       <div
-        className="relative bg-amber-50 border-2 border-dashed border-amber-200 rounded-xl overflow-hidden"
-        style={{ width: '100%', position: 'relative', paddingTop: '110%', minHeight: '380px', maxHeight: 'calc(100vh - 240px)' }}
+        className="relative bg-amber-50 border-2 border-dashed border-amber-200 rounded-xl overflow-auto"
+        style={{ height: '500px' }}
         ref={containerRef}
         onClick={handleContainerClick}
       >
@@ -407,8 +394,8 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
               key={seat.id}
               className="absolute group seat-item"
               style={{
-                left: `${seat.x * scale}px`,
-                top: `${seat.y * scale}px`,
+                left: `${seat.x}px`,
+                top: `${seat.y}px`,
                 cursor: editMode ? 'grab' : 'pointer',
               }}
               draggable={false}
@@ -435,8 +422,8 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
                     : 'bg-stone-400 hover:bg-stone-500'
                 } ${editMode ? 'ring-2 ring-yellow-400' : ''}`}
                 style={{
-                  width: `${seat.size * scale}px`,
-                  height: `${seat.size * scale}px`,
+                  width: `${seat.size}px`,
+                  height: `${seat.size}px`,
                 }}
               >
                 {session ? (
@@ -459,15 +446,7 @@ export default function SeatMap({ sessions, onSelectSeat, selectedSeatId, now, h
               {editMode && (
                 <div className="absolute top-0 right-0 transform translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity">
                   <button
-                    type="button"
-                    onPointerDown={(e) => {
-                      e.stopPropagation();
-                      e.preventDefault();
-                    }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteSeat(seat.id);
-                    }}
+                    onClick={() => deleteSeat(seat.id)}
                     className="bg-red-500 hover:bg-red-600 text-white rounded-full p-1 shadow-md"
                   >
                     <Trash2 className="w-4 h-4" />
